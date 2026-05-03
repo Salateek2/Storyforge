@@ -19,3 +19,15 @@ export function estimateReadingTime(wordCount) {
   if (wordCount <= 0) return 0
   return Math.ceil(wordCount / 200)
 }
+
+/**
+ * Formats a word count as a human-readable string.
+ * Examples: 0 -> "0 words", 1 -> "1 word", 1500 -> "1,500 words"
+ * @param {number} wordCount
+ * @returns {string}
+ */
+export function formatWordCount(wordCount) {
+  if (typeof wordCount !== 'number' || wordCount < 0) return '0 words'
+  const label = wordCount === 1 ? 'word' : 'words'
+  return `${wordCount.toLocaleString()} ${label}`
+}
