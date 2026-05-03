@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react'
+import React, { useState, useRef, useCallback } from 'react'
 import { countWords, formatWordCount } from './utils/wordCount'
 
 const INITIAL_CHAPTERS = [{ id: 1, title: 'Chapter 1', content: '' }]
@@ -20,6 +20,12 @@ const FONTS = [
   { key: 'Palatino, serif',          label: 'Palatino' },
   { key: "'Courier New', monospace", label: 'Courier New' },
 ]
+
+function estimateRT(wc) {
+  if (wc <= 0) return '0 min read'
+  const m = Math.ceil(wc / 200)
+  return m === 1 ? '1 min read' : m + ' min read'
+}
 
 function WelcomeScreen({ onStart }) {
   return (
@@ -85,54 +91,74 @@ function Sidebar({ tab, onTab, projectName, onRename, chapters, activeChapterId,
   )
 }
 
-function Toolbar() {
-  const exec = (cmd, val) => document.execCommand(cmd, false, val)
+function Toolbar({ onFormat }) {
   return (
     <div className="toolbar">
-      <button className="toolbar__btn" title="Bold" onMouseDown={e=>{e.preventDefault();exec('bold')}}><b>B</b></button>
-      <button className="toolbar__btn" title="Italic" onMouseDown={e=>{e.preventDefault();exec('italic')}}><i>I</i></button>
-      <button className="toolbar__btn" title="Underline" onMouseDown={e=>{e.preventDefault();exec('underline')}}><u>U</u></button>
+      <button className="toolbar__btn" title="Bold" onClick={() => onFormat('bold')}><b>B</b></button>
+      <button className="toolbar__btn" title="Italic" onClick={() => onFormat('italic')}><i>I</i></button>
+      <button className="toolbar__btn" title="Underline" onClick={() => onFormat('underline')}><u>U</u></button>
       <div className="toolbar__sep"/>
-      <button className="toolbar__btn" title="Heading" onMouseDown={e=>{e.preventDefault();exec('formatBlock','h2')}}>H</button>
-      <button className="toolbar__btn" title="Quote" onMouseDown={e=>{e.preventDefault();exec('formatBlock','blockquote')}}>"</button>
-      <button className="toolbar__btn" title="Normal" onMouseDown={e=>{e.preventDefault();exec('formatBlock','p')}}>¶</button>
+      <button className="toolbar__btn" title="Heading" onClick={() => onFormat('heading')}>H</button>
+      <button className="toolbar__btn" title="Quote" onClick={() => onFormat('quote')}>"</button>
     </div>
   )
 }
 
 function ChapterEditor({ chapter, onUpdate, font, fontSize }) {
-  const bodyRef = useRef(null)
-  const wordCount = countWords(chapter.content.replace(/<[^>]*>/g,''))
-  const onBodyInput = useCallback(() => {
-    onUpdate(chapter.id, 'content', bodyRef.current?.innerHTML || '')
-  }, [chapter.id, onUpdate])
+  const textareaRef = useRef(null)
+  const wordCount = countWords(chapter.content)
+
+  function handleFormat(type) {
+    const ta = textareaRef.current
+    if (!ta) return
+    const start = ta.selectionStart
+    const end = ta.selectionEnd
+    const selected = chapter.content.slice(start, end)
+    const before = chapter.content.slice(0, start)
+    const after = chapter.content.slice(end)
+    let replacement = selected
+    if (type === 'bold') replacement = `**${selected}**`
+    if (type === 'italic') replacement = `_${selected}_`
+    if (type === 'underline') replacement = `__${selected}__`
+    if (type === 'heading') replacement = `\n## ${selected}`
+    if (type === 'quote') replacement = `\n> ${selected}`
+    const newContent = before + replacement + after
+    onUpdate(chapter.id, 'content', newContent)
+    setTimeout(() => {
+      ta.focus()
+      ta.setSelectionRange(start + replacement.length, start + replacement.length)
+    }, 0)
+  }
+
   return (
     <div className="editor-area">
       <div className="editor-topbar">
         <span className="editor-topbar__title">{chapter.title}</span>
-        <Toolbar />
+        <Toolbar onFormat={handleFormat} />
         <span className="editor-topbar__meta">{formatWordCount(wordCount)} · {estimateRT(wordCount)}</span>
       </div>
       <div className="editor-scroll">
         <div className="editor-page">
-          <div className="editor-page__chapter-title" contentEditable suppressContentEditableWarning
-            data-placeholder="Chapter title..."
-            onBlur={e => onUpdate(chapter.id, 'title', e.target.innerText.trim() || 'Untitled')}>
-            {chapter.title}
-          </div>
-          <div ref={bodyRef} className="editor-content" contentEditable suppressContentEditableWarning
-            onInput={onBodyInput} style={{ fontFamily: font, fontSize: fontSize + 'px' }}
-            dangerouslySetInnerHTML={{ __html: chapter.content }} />
+          <input
+            className="editor-page__chapter-title-input"
+            value={chapter.title}
+            placeholder="Chapter title..."
+            onChange={e => onUpdate(chapter.id, 'title', e.target.value)}
+          />
+          <textarea
+            ref={textareaRef}
+            className="editor-content-textarea"
+            placeholder="Begin your story..."
+            value={chapter.content}
+            onChange={e => onUpdate(chapter.id, 'content', e.target.value)}
+            style={{ fontFamily: font, fontSize: fontSize + 'px' }}
+            dir="ltr"
+            spellCheck={true}
+          />
         </div>
       </div>
     </div>
   )
-}
-
-function estimateRT(wc) {
-  if (wc <= 0) return '0 min read'
-  const m = Math.ceil(wc / 200)
-  return m === 1 ? '1 min read' : m + ' min read'
 }
 
 function CharacterEditor({ character, onUpdate }) {
@@ -145,14 +171,14 @@ function CharacterEditor({ character, onUpdate }) {
             onChange={e => onUpdate(character.id, 'name', e.target.value)} />
           <textarea className="char-desc-area"
             placeholder="Describe this character — appearance, personality, backstory, motivations..."
-            value={character.description} onChange={e => onUpdate(character.id, 'description', e.target.value)} />
+            value={character.description} onChange={e => onUpdate(character.id, 'description', e.target.value)}
+            dir="ltr" />
         </div>
       </div>
     </div>
   )
 }
 
-/* ── Right panel ── */
 function RightPanel({ novels, activeNovelId, onSelectNovel, onAddNovel, theme, onTheme, font, onFont, fontSize, onFontSize }) {
   const [tab, setTab] = useState('Space')
   return (
@@ -162,25 +188,21 @@ function RightPanel({ novels, activeNovelId, onSelectNovel, onAddNovel, theme, o
           <button key={t} className={`right-panel__tab ${tab === t ? 'active' : ''}`} onClick={() => setTab(t)}>{t}</button>
         ))}
       </div>
-
-      {tab === 'Space' && (
-        <>
-          <div style={{padding:'0.75rem 1.1rem 0.4rem', borderBottom:'1px solid var(--border)'}}>
-            <span style={{fontSize:'0.7rem', letterSpacing:'0.1em', textTransform:'uppercase', color:'var(--text-light)'}}>My Novels</span>
-          </div>
-          <div className="novels-list">
-            {novels.map(n => (
-              <div key={n.id} className={`novel-card ${n.id === activeNovelId ? 'active' : ''}`} onClick={() => onSelectNovel(n.id)}>
-                <div className="novel-card__title">{n.title}</div>
-                <div className="novel-card__meta">{n.genre} · {n.chapters} ch.</div>
-                <span className="novel-card__badge">{n.status}</span>
-              </div>
-            ))}
-          </div>
-          <button className="novels-add-btn" onClick={onAddNovel}>+ New Novel</button>
-        </>
-      )}
-
+      {tab === 'Space' && <>
+        <div style={{padding:'0.75rem 1.1rem 0.4rem',borderBottom:'1px solid var(--border)'}}>
+          <span style={{fontSize:'0.7rem',letterSpacing:'0.1em',textTransform:'uppercase',color:'var(--text-light)'}}>My Novels</span>
+        </div>
+        <div className="novels-list">
+          {novels.map(n => (
+            <div key={n.id} className={`novel-card ${n.id === activeNovelId ? 'active' : ''}`} onClick={() => onSelectNovel(n.id)}>
+              <div className="novel-card__title">{n.title}</div>
+              <div className="novel-card__meta">{n.genre} · {n.chapters} ch.</div>
+              <span className="novel-card__badge">{n.status}</span>
+            </div>
+          ))}
+        </div>
+        <button className="novels-add-btn" onClick={onAddNovel}>+ New Novel</button>
+      </>}
       {tab === 'Settings' && (
         <div className="settings-panel">
           <div className="settings-section">
@@ -212,7 +234,6 @@ function RightPanel({ novels, activeNovelId, onSelectNovel, onAddNovel, theme, o
   )
 }
 
-/* ── Main ── */
 export default function App() {
   const [screen, setScreen] = useState('welcome')
   const [sidebarTab, setSidebarTab] = useState('Chapters')
@@ -228,7 +249,9 @@ export default function App() {
   const [font, setFont] = useState('Georgia, serif')
   const [fontSize, setFontSize] = useState(16)
 
-  useEffect(() => { document.documentElement.setAttribute('data-theme', theme === 'light' ? '' : theme) }, [theme])
+  React.useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme === 'light' ? '' : theme)
+  }, [theme])
 
   const activeChapter = chapters.find(c => c.id === activeChapterId) || null
   const activeChar = characters.find(c => c.id === activeCharId) || null
@@ -238,13 +261,10 @@ export default function App() {
   function updateChapter(id, field, value) { setChapters(p => p.map(c => c.id===id?{...c,[field]:value}:c)) }
   function addChar() { const id = Date.now(); setCharacters(p => [...p,{id,name:`Character ${p.length+1}`,description:''}]); setActiveCharId(id) }
   function updateChar(id, field, value) { setCharacters(p => p.map(c => c.id===id?{...c,[field]:value}:c)) }
-  function handleTab(t) { setSidebarTab(t); if (t==='Characters'&&!activeCharId&&characters.length>0) setActiveCharId(characters[0].id) }
-  function addNovel() { const id = Date.now(); setNovels(p => [...p,{id,title:'New Novel',genre:'Fiction',chapters:0,status:'Draft'}]); setActiveNovelId(id) }
+  function handleTab(t) { setSidebarTab(t); if(t==='Characters'&&!activeCharId&&characters.length>0) setActiveCharId(characters[0].id) }
+  function addNovel() { const id=Date.now(); setNovels(p=>[...p,{id,title:'New Novel',genre:'Fiction',chapters:0,status:'Draft'}]); setActiveNovelId(id) }
 
   if (screen === 'welcome') return <WelcomeScreen onStart={handleStart} />
-
-  const showChar = sidebarTab === 'Characters' && activeChar
-  const showChapter = sidebarTab === 'Chapters' && activeChapter
 
   return (
     <div className="app">
@@ -253,13 +273,12 @@ export default function App() {
         onSelectChapter={id => { setActiveChapterId(id); setSidebarTab('Chapters') }}
         onAddChapter={addChapter} characters={characters} activeCharId={activeCharId}
         onSelectChar={setActiveCharId} onAddChar={addChar} notes={notes} onNotes={setNotes} />
-
-      {showChar && <CharacterEditor character={activeChar} onUpdate={updateChar} />}
-      {showChapter && <ChapterEditor chapter={activeChapter} onUpdate={updateChapter} font={font} fontSize={fontSize} />}
-      {!showChar && !showChapter && (
-        <div className="editor-area"><div className="editor-empty">Select an item from the sidebar</div></div>
-      )}
-
+      {sidebarTab === 'Characters' && activeChar
+        ? <CharacterEditor character={activeChar} onUpdate={updateChar} />
+        : sidebarTab === 'Chapters' && activeChapter
+          ? <ChapterEditor chapter={activeChapter} onUpdate={updateChapter} font={font} fontSize={fontSize} />
+          : <div className="editor-area"><div className="editor-empty">Select an item from the sidebar</div></div>
+      }
       <RightPanel novels={novels} activeNovelId={activeNovelId} onSelectNovel={setActiveNovelId} onAddNovel={addNovel}
         theme={theme} onTheme={setTheme} font={font} onFont={setFont} fontSize={fontSize} onFontSize={setFontSize} />
     </div>

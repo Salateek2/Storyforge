@@ -145,3 +145,20 @@ body { font-family: Georgia,'Times New Roman',serif; background: var(--bg); colo
 ::-webkit-scrollbar { width:5px; }
 ::-webkit-scrollbar-track { background:transparent; }
 ::-webkit-scrollbar-thumb { background:var(--border); border-radius:3px; }
+
+
+.editor-page__chapter-title-input {
+  font-size: 1.5rem; font-family: Georgia, serif; font-weight: normal;
+  color: var(--accent); border: none; border-bottom: 1px solid var(--border);
+  background: transparent; outline: none; width: 100%;
+  margin-bottom: 1.5rem; padding-bottom: 1rem; display: block;
+}
+.editor-page__chapter-title-input::placeholder { color: var(--border); }
+
+.editor-content-textarea {
+  width: 100%; min-height: 500px; border: none; background: transparent;
+  font-family: Georgia, serif; font-size: 1.05rem; line-height: 1.9;
+  color: var(--text-dark); resize: none; outline: none;
+  display: block; direction: ltr; unicode-bidi: plaintext;
+}
+.editor-content-textarea::placeholder { color: var(--border); }
