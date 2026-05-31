@@ -238,7 +238,9 @@ function StatusDot({ status, onCycle }) {
   )
 }
 
-function Sidebar({ tab, onTab, projectName, onRename, chapters, activeChapterId, onSelectChapter, onAddChapter, onCycleStatus, onDeleteChapter, onOpenChapterInfo, characters, activeCharId, onSelectChar, onAddChar, notes, onNotes, mobileOpen, onMobileClose }) {
+function Sidebar({ tab, onTab, projectName, onRename, chapters, activeChapterId, onSelectChapter, onAddChapter, onCycleStatus, onDeleteChapter, onOpenChapterInfo, characters, activeCharId, onSelectChar, onAddChar, notes, activeNoteId, onSelectNote, onAddNote, onUpdateNote, onDeleteNote, mobileOpen, onMobileClose }) {
+  const [renamingNoteId, setRenamingNoteId] = useState(null)
+  const activeNote = notes.find(n => n.id === activeNoteId)
   const [searchQuery, setSearchQuery] = useState('')
   const showSearch = searchQuery.trim().length > 0
   const searchResults = showSearch ? searchChapters(chapters, searchQuery.trim()) : []
@@ -307,8 +309,43 @@ function Sidebar({ tab, onTab, projectName, onRename, chapters, activeChapterId,
         </>}
         {tab === 'Notes' && (
           <div className="notes-area">
-            <span className="notes-label">Project notes</span>
-            <textarea placeholder="Jot down plot ideas, world-building details, reminders..." value={notes} onChange={e => onNotes(e.target.value)} />
+            <div className="note-tabs">
+              {notes.map(n => (
+                <div
+                  key={n.id}
+                  className={`note-tab ${activeNoteId === n.id ? 'active' : ''}`}
+                  onClick={() => onSelectNote(n.id)}
+                  onDoubleClick={() => setRenamingNoteId(n.id)}
+                  title="Double-click to rename"
+                >
+                  {renamingNoteId === n.id ? (
+                    <input
+                      className="note-tab__rename"
+                      autoFocus
+                      defaultValue={n.title || ''}
+                      onClick={e => e.stopPropagation()}
+                      onBlur={e => { onUpdateNote(n.id, 'title', e.target.value.trim() || n.title); setRenamingNoteId(null) }}
+                      onKeyDown={e => { if (e.key === 'Enter') e.target.blur(); if (e.key === 'Escape') setRenamingNoteId(null) }}
+                    />
+                  ) : (
+                    <span className="note-tab__label">{n.title || 'Untitled'}</span>
+                  )}
+                </div>
+              ))}
+              <button className="note-tab__add" onClick={onAddNote} title="New note">+</button>
+            </div>
+            {activeNote ? (
+              <>
+                <textarea
+                  placeholder="Jot down plot ideas, world-building details, reminders..."
+                  value={activeNote.content || ''}
+                  onChange={e => onUpdateNote(activeNote.id, 'content', e.target.value)}
+                />
+                <button className="note-delete-btn" onClick={() => onDeleteNote(activeNote.id)}>Delete this note</button>
+              </>
+            ) : (
+              <p className="notes-empty">No notes yet. Click + to create one.</p>
+            )}
           </div>
         )}
       </>}
@@ -880,7 +917,8 @@ export default function App() {
   const [activeChapterId, setActiveChapterId] = useState(null)
   const [characters, setCharacters] = useState([])
   const [activeCharId, setActiveCharId] = useState(null)
-  const [notes, setNotes] = useState('')
+  const [notes, setNotes] = useState([])
+  const [activeNoteId, setActiveNoteId] = useState(null)
   const [novels, setNovels] = useState([])
   const [activeNovelId, setActiveNovelId] = useState(null)
   const [theme, setTheme] = useState(() => localStorage.getItem('sf_theme') || 'light')
@@ -891,7 +929,6 @@ export default function App() {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
   const [mobileRightOpen, setMobileRightOpen] = useState(false)
   const saveTimers = useRef({})
-  const notesRowId = useRef(null)
   const guestChaptersByNovel = useRef({})
 
   useEffect(() => { localStorage.setItem('sf_theme', theme) }, [theme])
@@ -944,7 +981,8 @@ export default function App() {
     setChapters(seededChaptersByNovel[opener.id])
     setActiveChapterId(seededChaptersByNovel[opener.id][0]?.id || null)
     setCharacters([])
-    setNotes('')
+    setNotes([])
+    setActiveNoteId(null)
   }
 
   async function loadNovels(currentUser) {
@@ -1001,9 +1039,9 @@ export default function App() {
     ])
     setChapters(chaptersRes.data || [])
     setCharacters(charsRes.data || [])
-    const noteRow = notesRes.data?.[0]
-    setNotes(noteRow?.content || '')
-    notesRowId.current = noteRow?.id || null
+    const noteRows = notesRes.data || []
+    setNotes(noteRows)
+    setActiveNoteId(noteRows[0]?.id || null)
     setActiveChapterId(chaptersRes.data?.[0]?.id || null)
     setActiveCharId(null)
     setDataLoading(false)
@@ -1070,21 +1108,31 @@ export default function App() {
     saveTimers.current[key] = setTimeout(() => dbUpdate('characters', `id=eq.${id}`, { [field]: value }), 1500)
   }
 
-  function handleNotes(content) {
-    setNotes(content)
+  async function addNote() {
+    const title = `Note ${notes.length + 1}`
+    if (user.isGuest) {
+      const note = { id: 'note-' + Date.now(), novel_id: activeNovelId, title, content: '' }
+      setNotes(p => [...p, note]); setActiveNoteId(note.id)
+      return
+    }
+    const { data } = await dbInsert('notes', { novel_id: activeNovelId, user_id: user.id, title, content: '' })
+    const note = Array.isArray(data) ? data[0] : data
+    if (note) { setNotes(p => [...p, note]); setActiveNoteId(note.id) }
+  }
+
+  function updateNote(id, field, value) {
+    setNotes(p => p.map(n => n.id === id ? { ...n, [field]: value } : n))
     if (user.isGuest) return
-    const novelId = activeNovelId
-    const userId = user.id
-    clearTimeout(saveTimers.current['notes'])
-    saveTimers.current['notes'] = setTimeout(async () => {
-      if (notesRowId.current) {
-        dbUpdate('notes', `id=eq.${notesRowId.current}`, { content })
-      } else {
-        const { data } = await dbInsert('notes', { novel_id: novelId, user_id: userId, content })
-        const row = Array.isArray(data) ? data[0] : data
-        if (row?.id) notesRowId.current = row.id
-      }
-    }, 1500)
+    const key = `note_${id}_${field}`
+    clearTimeout(saveTimers.current[key])
+    saveTimers.current[key] = setTimeout(() => dbUpdate('notes', `id=eq.${id}`, { [field]: value }), 1500)
+  }
+
+  function deleteNote(id) {
+    const remaining = notes.filter(n => n.id !== id)
+    setNotes(remaining)
+    if (activeNoteId === id) setActiveNoteId(remaining[0]?.id || null)
+    if (!user.isGuest) dbDelete('notes', `id=eq.${id}`)
   }
 
   async function deleteNovel(id) {
@@ -1104,7 +1152,8 @@ export default function App() {
         setChapters(nextChapters)
         setActiveChapterId(nextChapters[0]?.id || null)
         setCharacters([])
-        setNotes('')
+        setNotes([])
+        setActiveNoteId(null)
       }
     }
   }
@@ -1115,7 +1164,7 @@ export default function App() {
       const n = { id: 'novel-' + Date.now(), title: 'New Novel', genre: '', status: 'Idea' }
       guestChaptersByNovel.current[n.id] = []
       setNovels(p => [...p, n]); setActiveNovelId(n.id); setProjectName(n.title)
-      setChapters([]); setCharacters([]); setNotes('')
+      setChapters([]); setCharacters([]); setNotes([]); setActiveNoteId(null)
       return
     }
     const { data } = await dbInsert('novels', { user_id: user.id, title: 'New Novel', genre: '', status: 'Idea' })
@@ -1172,7 +1221,7 @@ export default function App() {
 
   async function handleSignOut() {
     if (!user.isGuest) await signOut()
-    setUser(null); setNovels([]); setChapters([]); setCharacters([]); setNotes(''); setActiveNovelId(null)
+    setUser(null); setNovels([]); setChapters([]); setCharacters([]); setNotes([]); setActiveNoteId(null); setActiveNovelId(null)
   }
 
   const totalWords = chapters.reduce((sum, c) => sum + countWords(c.content), 0)
@@ -1200,7 +1249,8 @@ export default function App() {
         onOpenChapterInfo={setChapterInfoOpenId}
         characters={characters} activeCharId={activeCharId}
         onSelectChar={id => { setActiveCharId(id); setMobileSidebarOpen(false) }} onAddChar={addChar}
-        notes={notes} onNotes={handleNotes}
+        notes={notes} activeNoteId={activeNoteId} onSelectNote={setActiveNoteId}
+        onAddNote={addNote} onUpdateNote={updateNote} onDeleteNote={deleteNote}
         mobileOpen={mobileSidebarOpen} onMobileClose={() => setMobileSidebarOpen(false)} />
       {sidebarTab === 'Characters' && activeChar
         ? <CharacterEditor character={activeChar} onUpdate={updateChar} />

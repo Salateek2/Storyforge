@@ -104,6 +104,17 @@ body { font-family: Georgia,'Times New Roman',serif; background: var(--bg); colo
 .notes-area textarea { width:100%; min-height:300px; background:var(--bg); border:1px solid var(--border); border-radius:2px; font-family:Georgia,serif; font-size:0.88rem; color:var(--text-dark); padding:0.75rem; resize:none; outline:none; line-height:1.7; }
 .notes-area textarea:focus { border-color:var(--accent); }
 .notes-label { font-size:0.68rem; letter-spacing:0.1em; text-transform:uppercase; color:var(--text-light); margin-bottom:0.5rem; display:block; }
+.note-tabs { display:flex; flex-wrap:wrap; gap:4px; margin-bottom:0.6rem; align-items:center; }
+.note-tab { display:flex; align-items:center; max-width:120px; padding:0.3rem 0.55rem; background:var(--bg-hover); border:1px solid var(--border); border-radius:3px; font-size:0.78rem; color:var(--text-mid); cursor:pointer; transition:all 0.15s; }
+.note-tab:hover { border-color:var(--accent); color:var(--text-dark); }
+.note-tab.active { background:var(--bg); border-color:var(--accent); color:var(--accent); }
+.note-tab__label { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.note-tab__rename { width:90px; background:var(--bg); border:none; outline:none; font-family:Georgia,serif; font-size:0.78rem; color:var(--text-dark); }
+.note-tab__add { padding:0.3rem 0.55rem; background:transparent; border:1px dashed var(--border); border-radius:3px; color:var(--text-light); cursor:pointer; font-size:0.9rem; line-height:1; transition:all 0.15s; }
+.note-tab__add:hover { background:var(--bg-hover); border-color:var(--accent); color:var(--accent); }
+.note-delete-btn { margin-top:0.5rem; padding:0.35rem 0.6rem; background:transparent; border:1px solid var(--border); border-radius:2px; color:var(--text-light); font-family:Georgia,serif; font-size:0.76rem; cursor:pointer; transition:all 0.15s; }
+.note-delete-btn:hover { border-color:#c0392b; color:#c0392b; }
+.notes-empty { font-size:0.82rem; color:var(--text-light); font-style:italic; padding:1rem 0; }
 
 /* ── Editor ── */
 .editor-area { flex:1; display:flex; flex-direction:column; background:var(--bg); overflow:hidden; min-width:0; }
