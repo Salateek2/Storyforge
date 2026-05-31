@@ -6,7 +6,12 @@
  */
 export function countWords(text) {
   if (!text || typeof text !== 'string') return 0
-  return text.trim().split(/\s+/).filter(Boolean).length
+  // Strip HTML tags so editor content stored as rich-text HTML counts as plain words.
+  const plain = text.replace(/<[^>]*>/g, ' ')
+  // A token counts as a word only if it contains at least one letter or digit
+  // (Unicode-aware, so non-English letters work). This excludes lone punctuation
+  // like "-", "—", "...", "?" from being counted as words.
+  return plain.trim().split(/\s+/).filter(w => /[\p{L}\p{N}]/u.test(w)).length
 }
 
 /**
