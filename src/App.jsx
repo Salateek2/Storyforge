@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react'
 import { countWords, formatWordCount } from './utils/wordCount'
-import { signIn, signUp, signOut, getUser, dbSelect, dbInsert, dbUpdate, dbDelete } from './lib/supabase'
+import { signIn, signUp, signOut, getUser, dbSelect, dbInsert, dbUpdate, dbDelete, dbUpsert } from './lib/supabase'
 import { continueWriting, summarizeChapter, rephraseText, suggestNext } from './lib/ai'
 
 const STATUS_CYCLE = ['Draft', 'In Progress', 'Done']
@@ -32,25 +32,14 @@ function parseGenres(g) {
 }
 function joinGenres(arr) { return arr.join(', ') }
 
+// Each key maps to a column on the `chapters` table so this info syncs to
+// Supabase (it used to live only in localStorage on a single device).
 const CHAPTER_META_FIELDS = [
-  { key: 'summary',    label: 'Summary',              type: 'textarea',   rows: 4, placeholder: 'What happens in this chapter?' },
-  { key: 'characters', label: 'Characters appearing', type: 'characters', rows: 2, placeholder: 'Who appears in this chapter?' },
-  { key: 'pov',        label: 'POV',                  type: 'input',               placeholder: 'Whose perspective is the chapter told from?' },
-  { key: 'todo',       label: 'TODO / notes',         type: 'textarea',   rows: 3, placeholder: 'Things to research, fact-check, or come back to' },
+  { key: 'summary',              label: 'Summary',              type: 'textarea',   rows: 4, placeholder: 'What happens in this chapter?' },
+  { key: 'characters_appearing', label: 'Characters appearing', type: 'characters', rows: 2, placeholder: 'Who appears in this chapter?' },
+  { key: 'pov',                  label: 'POV',                  type: 'input',               placeholder: 'Whose perspective is the chapter told from?' },
+  { key: 'todo',                 label: 'TODO / notes',         type: 'textarea',   rows: 3, placeholder: 'Things to research, fact-check, or come back to' },
 ]
-function getChapterMeta(chapterId) {
-  if (!chapterId) return {}
-  try { return JSON.parse(localStorage.getItem('sf_ch_meta_' + chapterId)) || {} }
-  catch { return {} }
-}
-function setChapterMeta(chapterId, meta) {
-  if (!chapterId) return
-  localStorage.setItem('sf_ch_meta_' + chapterId, JSON.stringify(meta))
-}
-function deleteChapterMeta(chapterId) {
-  if (!chapterId) return
-  localStorage.removeItem('sf_ch_meta_' + chapterId)
-}
 
 const EXAMPLE_NOVELS = [
   {
@@ -466,16 +455,12 @@ function CharactersAutocompleteField({ value, onChange, placeholder, rows, chara
   )
 }
 
-function ChapterInfoModal({ chapter, characters, onClose }) {
-  const [meta, setMeta] = useState(() => getChapterMeta(chapter.id))
+function ChapterInfoModal({ chapter, characters, onClose, onUpdate }) {
   const [summarizing, setSummarizing] = useState(false)
   const [summaryError, setSummaryError] = useState('')
 
-  function save(next) {
-    setMeta(next)
-    setChapterMeta(chapter.id, next)
-  }
-  function update(key, value) { save({ ...meta, [key]: value }) }
+  // Writes go straight to the chapter row (debounced auto-save in updateChapter).
+  function update(key, value) { onUpdate(chapter.id, key, value) }
 
   async function handleAutoSummarize() {
     if (!chapter.content || !chapter.content.trim()) {
@@ -534,12 +519,12 @@ function ChapterInfoModal({ chapter, characters, onClose }) {
                 <input
                   className="ch-info-field__input"
                   placeholder={f.placeholder}
-                  value={meta[f.key] || ''}
+                  value={chapter[f.key] || ''}
                   onChange={e => update(f.key, e.target.value)}
                 />
               ) : f.type === 'characters' ? (
                 <CharactersAutocompleteField
-                  value={meta[f.key] || ''}
+                  value={chapter[f.key] || ''}
                   onChange={v => update(f.key, v)}
                   placeholder={f.placeholder}
                   rows={f.rows}
@@ -550,7 +535,7 @@ function ChapterInfoModal({ chapter, characters, onClose }) {
                   className="ch-info-field__textarea"
                   rows={f.rows || 3}
                   placeholder={f.placeholder}
-                  value={meta[f.key] || ''}
+                  value={chapter[f.key] || ''}
                   onChange={e => update(f.key, e.target.value)}
                 />
               )}
@@ -558,7 +543,7 @@ function ChapterInfoModal({ chapter, characters, onClose }) {
           ))}
         </div>
         <div className="ch-info-modal__foot">
-          <span className="ch-info-modal__hint">Saved automatically · stored on this device</span>
+          <span className="ch-info-modal__hint">Saved automatically · synced to your account</span>
           <button className="ch-info-modal__done" onClick={onClose}>Done</button>
         </div>
       </div>
@@ -1058,6 +1043,9 @@ export default function App() {
   const [mobileRightOpen, setMobileRightOpen] = useState(false)
   const saveTimers = useRef({})
   const guestChaptersByNovel = useRef({})
+  // Becomes true once settings have been loaded from the DB, so the persist
+  // effect below doesn't overwrite saved settings with initial defaults.
+  const settingsLoadedRef = useRef(false)
 
   useEffect(() => { localStorage.setItem('sf_theme', theme) }, [theme])
   useEffect(() => { localStorage.setItem('sf_wordGoal', wordGoal) }, [wordGoal])
@@ -1065,6 +1053,22 @@ export default function App() {
     if (pinnedNovelId) localStorage.setItem('sf_pinned_novel', pinnedNovelId)
     else localStorage.removeItem('sf_pinned_novel')
   }, [pinnedNovelId])
+
+  // Sync per-user settings to Supabase so theme / word goal / pinned novel
+  // follow the user across devices. Guests stay local-only.
+  useEffect(() => {
+    if (!user || user.isGuest || !settingsLoadedRef.current) return
+    clearTimeout(saveTimers.current['settings'])
+    saveTimers.current['settings'] = setTimeout(() => {
+      dbUpsert('user_settings', {
+        user_id: user.id,
+        theme,
+        word_goal: wordGoal,
+        pinned_novel_id: pinnedNovelId || null,
+        updated_at: new Date().toISOString(),
+      })
+    }, 800)
+  }, [theme, wordGoal, pinnedNovelId, user])
   useEffect(() => {
     const effective = user ? theme : 'light'
     document.documentElement.setAttribute('data-theme', effective === 'light' ? '' : effective)
@@ -1116,8 +1120,24 @@ export default function App() {
   async function loadNovels(currentUser) {
     setDataLoading(true)
     const { data } = await dbSelect('novels', 'order=created_at.asc')
+
+    // Load synced settings first so the pinned novel below reflects the
+    // account-level choice rather than whatever is cached on this device.
+    let pinnedId = pinnedNovelId
+    const { data: settingsRows } = await dbSelect('user_settings', `user_id=eq.${currentUser.id}`)
+    const s = settingsRows?.[0]
+    if (s) {
+      if (s.theme) setTheme(s.theme)
+      setWordGoal(s.word_goal || 0)
+      pinnedId = s.pinned_novel_id || null
+      setPinnedNovelId(pinnedId)
+    } else {
+      await dbInsert('user_settings', { user_id: currentUser.id, theme, word_goal: wordGoal, pinned_novel_id: null })
+    }
+    settingsLoadedRef.current = true
+
     if (data && data.length > 0) {
-      const pinned = pinnedNovelId && data.find(n => n.id === pinnedNovelId)
+      const pinned = pinnedId && data.find(n => n.id === pinnedId)
       const opener = pinned || data[0]
       setNovels(data)
       setProjectName(opener.title)
@@ -1173,6 +1193,30 @@ export default function App() {
     setActiveChapterId(chaptersRes.data?.[0]?.id || null)
     setActiveCharId(null)
     setDataLoading(false)
+    migrateLocalChapterMeta(chaptersRes.data || [])
+  }
+
+  // One-time move of chapter info (summary / POV / characters / TODO) from the
+  // old per-device localStorage store into the chapters table. Runs quietly the
+  // first time a chapter with legacy data is opened, then clears localStorage.
+  async function migrateLocalChapterMeta(chapterRows) {
+    const map = { summary: 'summary', pov: 'pov', todo: 'todo', characters: 'characters_appearing' }
+    for (const ch of chapterRows) {
+      const raw = localStorage.getItem('sf_ch_meta_' + ch.id)
+      if (!raw) continue
+      let meta
+      try { meta = JSON.parse(raw) } catch { localStorage.removeItem('sf_ch_meta_' + ch.id); continue }
+      const patch = {}
+      for (const [oldKey, col] of Object.entries(map)) {
+        if (meta?.[oldKey] && !ch[col]) patch[col] = meta[oldKey]
+      }
+      if (Object.keys(patch).length) {
+        const { error } = await dbUpdate('chapters', `id=eq.${ch.id}`, patch)
+        if (error) continue   // keep localStorage if the write failed, retry next load
+        setChapters(p => p.map(c => c.id === ch.id ? { ...c, ...patch } : c))
+      }
+      localStorage.removeItem('sf_ch_meta_' + ch.id)
+    }
   }
 
   async function addChapter() {
@@ -1210,7 +1254,6 @@ export default function App() {
     const remaining = chapters.filter(c => c.id !== id)
     setChapters(remaining)
     if (activeChapterId === id) setActiveChapterId(remaining[0]?.id || null)
-    deleteChapterMeta(id)
     if (!user.isGuest) dbDelete('chapters', `id=eq.${id}`)
   }
 
@@ -1349,6 +1392,7 @@ export default function App() {
 
   async function handleSignOut() {
     if (!user.isGuest) await signOut()
+    settingsLoadedRef.current = false
     setUser(null); setNovels([]); setChapters([]); setCharacters([]); setNotes([]); setActiveNoteId(null); setActiveNovelId(null)
   }
 
@@ -1397,7 +1441,7 @@ export default function App() {
         wordGoal={wordGoal} onWordGoal={setWordGoal} onSignOut={handleSignOut}
         mobileOpen={mobileRightOpen} onMobileClose={() => setMobileRightOpen(false)} />
       {chapterInfoChapter && (
-        <ChapterInfoModal chapter={chapterInfoChapter} characters={characters} onClose={() => setChapterInfoOpenId(null)} />
+        <ChapterInfoModal chapter={chapterInfoChapter} characters={characters} onUpdate={updateChapter} onClose={() => setChapterInfoOpenId(null)} />
       )}
     </div>
   )

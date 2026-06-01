@@ -66,3 +66,6 @@ export const dbSelect = (table, query = '') => request(`/${table}${query ? '?' +
 export const dbInsert = (table, body)        => request(`/${table}`, 'POST', body)
 export const dbUpdate = (table, filter, body) => request(`/${table}?${filter}`, 'PATCH', body)
 export const dbDelete = (table, filter)       => request(`/${table}?${filter}`, 'DELETE')
+// Insert-or-update on the primary key. Requires a unique/PK column to merge on.
+export const dbUpsert = (table, body) =>
+  request(`/${table}`, 'POST', body, { 'Prefer': 'return=representation,resolution=merge-duplicates' })
