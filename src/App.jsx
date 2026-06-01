@@ -1,7 +1,7 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react'
 import { countWords, formatWordCount } from './utils/wordCount'
 import { signIn, signUp, signOut, getUser, dbSelect, dbInsert, dbUpdate, dbDelete } from './lib/supabase'
-import { continueWriting, summarizeChapter } from './lib/ai'
+import { continueWriting, summarizeChapter, rephraseText, suggestNext } from './lib/ai'
 
 const STATUS_CYCLE = ['Draft', 'In Progress', 'Done']
 const STATUS_COLOR = { Draft: '#9ca3af', 'In Progress': '#f59e0b', Done: '#22c55e' }
@@ -591,11 +591,127 @@ function ExportMenu({ chapter, chapters, projectName }) {
   )
 }
 
+const AI_ACTIONS = [
+  { key: 'continue', label: '✨ Continue writing', hint: 'Adds 2–3 new paragraphs to the end of the chapter.' },
+  { key: 'rephrase', label: '✦ Rephrase selection', hint: 'Select text in the chapter first, then rewrite it for flow & clarity.' },
+  { key: 'suggest',  label: '➔ Suggest what happens next', hint: 'Get 3 ideas for where the story could go from here.' },
+]
+
+function AIAssistantPanel({ open, onClose, chapter, genre, getSelectedText, onAppend, onReplaceSelection }) {
+  const [mode, setMode] = useState(null)        // which action is running / produced the result
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [result, setResult] = useState('')
+  const [sourceText, setSourceText] = useState('') // selection captured for rephrase
+
+  // Reset transient state when the panel closes or the chapter changes.
+  useEffect(() => {
+    if (!open) { setMode(null); setResult(''); setError(''); setLoading(false); setSourceText('') }
+  }, [open, chapter?.id])
+
+  async function run(action) {
+    setError('')
+    setResult('')
+    setMode(action)
+    let selected = ''
+    if (action === 'rephrase') {
+      selected = (getSelectedText() || '').trim()
+      if (!selected) {
+        setError('Select some text in the chapter first, then click Rephrase.')
+        setMode(null)
+        return
+      }
+      setSourceText(selected)
+    }
+    setLoading(true)
+    try {
+      let out
+      if (action === 'continue') out = await continueWriting(chapter.content, genre)
+      else if (action === 'rephrase') out = await rephraseText(selected, genre)
+      else out = await suggestNext(chapter.content, genre)
+      setResult((out || '').trim())
+    } catch (err) {
+      setError(err.message || 'AI request failed. Is the server running?')
+    }
+    setLoading(false)
+  }
+
+  function applyContinue() {
+    onAppend(result)
+    setResult(''); setMode(null)
+  }
+  function applyRephrase() {
+    const ok = onReplaceSelection(result)
+    if (!ok) { setError('Could not find the original selection to replace. Re-select the text and try again.'); return }
+    setResult(''); setMode(null); setSourceText('')
+  }
+  function copyResult() { navigator.clipboard?.writeText(result) }
+
+  return (
+    <div className={`ai-panel ${open ? 'ai-panel--open' : ''}`} aria-hidden={!open}>
+      <div className="ai-panel__head">
+        <span className="ai-panel__title">✨ AI Assistant</span>
+        <button className="ai-panel__close" onClick={onClose} title="Close">×</button>
+      </div>
+
+      <div className="ai-panel__actions">
+        {AI_ACTIONS.map(a => (
+          <button
+            key={a.key}
+            className={`ai-panel__action ${mode === a.key ? 'active' : ''}`}
+            onClick={() => run(a.key)}
+            disabled={loading}
+            title={a.hint}
+          >
+            <span className="ai-panel__action-label">{a.label}</span>
+            <span className="ai-panel__action-hint">{a.hint}</span>
+          </button>
+        ))}
+      </div>
+
+      <div className="ai-panel__body">
+        {loading && <div className="ai-panel__loading">Thinking…</div>}
+        {error && <div className="ai-error-bar ai-error-bar--inline">{error}</div>}
+
+        {!loading && result && mode === 'rephrase' && sourceText && (
+          <div className="ai-panel__source">
+            <span className="ai-panel__source-label">Original</span>
+            <p>{sourceText}</p>
+          </div>
+        )}
+
+        {!loading && result && (
+          <div className="ai-panel__result">
+            {mode === 'suggest'
+              ? <div className="ai-panel__result-text">{result}</div>
+              : <p className="ai-panel__result-text">{result}</p>}
+
+            <div className="ai-panel__result-actions">
+              {mode === 'continue' && (
+                <button className="ai-panel__apply" onClick={applyContinue}>Insert at end</button>
+              )}
+              {mode === 'rephrase' && (
+                <button className="ai-panel__apply" onClick={applyRephrase}>Replace selection</button>
+              )}
+              <button className="ai-panel__secondary" onClick={copyResult}>Copy</button>
+              <button className="ai-panel__secondary" onClick={() => run(mode)} disabled={loading}>Regenerate</button>
+              <button className="ai-panel__secondary" onClick={() => { setResult(''); setMode(null) }}>Dismiss</button>
+            </div>
+          </div>
+        )}
+
+        {!loading && !result && !error && (
+          <p className="ai-panel__placeholder">Pick an action above. AI output appears here for you to review before it touches your chapter.</p>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function ChapterEditor({ chapter, chapters, projectName, onUpdate, focusMode, onToggleFocus, totalWords, wordGoal, genre }) {
   const editorRef = useRef(null)
   const savedRangeRef = useRef(null)
-  const [aiLoading, setAiLoading] = useState(false)
-  const [aiError, setAiError] = useState('')
+  const [aiPanelOpen, setAiPanelOpen] = useState(false)
   const wordCount = countWords(chapter.content)
   const goalPct = wordGoal > 0 ? Math.min(100, Math.round((totalWords / wordGoal) * 100)) : 0
 
@@ -662,25 +778,30 @@ function ChapterEditor({ chapter, chapters, projectName, onUpdate, focusMode, on
     onUpdate(chapter.id, 'content', editor.innerHTML)
   }
 
-  async function handleContinue() {
-    if (!chapter.content.trim()) {
-      setAiError('Write something first before asking AI to continue.')
-      setTimeout(() => setAiError(''), 3000)
-      return
-    }
-    setAiLoading(true)
-    setAiError('')
-    try {
-      const continuation = await continueWriting(chapter.content, genre)
-      // Append the continuation as new paragraphs
-      const appended = chapter.content.trimEnd() + '\n' + continuation.split('\n').map(p => p.trim() ? `<p>${p}</p>` : '').join('')
-      onUpdate(chapter.id, 'content', appended)
-      if (editorRef.current) editorRef.current.innerHTML = appended
-    } catch (err) {
-      setAiError(err.message || 'AI request failed. Is the server running?')
-      setTimeout(() => setAiError(''), 5000)
-    }
-    setAiLoading(false)
+  // Append AI-generated prose as new paragraphs at the end of the chapter.
+  function appendContinuation(text) {
+    const appended = (chapter.content || '').trimEnd() + '\n' +
+      text.split('\n').map(p => p.trim() ? `<p>${p}</p>` : '').join('')
+    onUpdate(chapter.id, 'content', appended)
+    if (editorRef.current) editorRef.current.innerHTML = appended
+  }
+
+  // Plain text of the last selection made inside the editor (for Rephrase).
+  function getSelectedText() {
+    return savedRangeRef.current ? savedRangeRef.current.toString() : ''
+  }
+
+  // Replace that selection with the rewritten text. Returns false if the
+  // saved range is gone/collapsed so the panel can prompt a re-select.
+  function replaceSelection(text) {
+    const range = savedRangeRef.current
+    const editor = editorRef.current
+    if (!range || !editor || range.collapsed || !editor.contains(range.commonAncestorContainer)) return false
+    range.deleteContents()
+    range.insertNode(document.createTextNode(text))
+    onUpdate(chapter.id, 'content', editor.innerHTML)
+    savedRangeRef.current = null
+    return true
   }
 
   return (
@@ -690,19 +811,17 @@ function ChapterEditor({ chapter, chapters, projectName, onUpdate, focusMode, on
         <Toolbar onFormat={handleFormat} />
         <span className="editor-topbar__meta">{formatWordCount(wordCount)} · {estimateRT(wordCount)}</span>
         <button
-          className={`toolbar__btn ai-continue-btn${aiLoading ? ' ai-loading' : ''}`}
-          title="Ask AI to continue writing"
-          onClick={handleContinue}
-          disabled={aiLoading}
+          className={`toolbar__btn ai-continue-btn${aiPanelOpen ? ' active' : ''}`}
+          title="Open the AI writing assistant"
+          onClick={() => setAiPanelOpen(o => !o)}
         >
-          {aiLoading ? '…' : '✨ Continue'}
+          ✨ AI
         </button>
         <ExportMenu chapter={chapter} chapters={chapters} projectName={projectName} />
         <button className={`focus-btn ${focusMode ? 'active' : ''}`} onClick={onToggleFocus} title={focusMode ? 'Exit focus mode' : 'Focus mode'}>
           {focusMode ? '⊠' : '⊞'}
         </button>
       </div>
-      {aiError && <div className="ai-error-bar">{aiError}</div>}
       {wordGoal > 0 && (
         <div className="word-goal-bar">
           <div className="word-goal-bar__track">
@@ -733,6 +852,15 @@ function ChapterEditor({ chapter, chapters, projectName, onUpdate, focusMode, on
           />
         </div>
       </div>
+      <AIAssistantPanel
+        open={aiPanelOpen}
+        onClose={() => setAiPanelOpen(false)}
+        chapter={chapter}
+        genre={genre}
+        getSelectedText={getSelectedText}
+        onAppend={appendContinuation}
+        onReplaceSelection={replaceSelection}
+      />
     </div>
   )
 }

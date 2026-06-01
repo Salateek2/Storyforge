@@ -50,5 +50,31 @@ app.post('/api/ai/summarize', async (req, res) => {
   }
 })
 
+// Rephrase selection
+app.post('/api/ai/rephrase', async (req, res) => {
+  const { text, genre } = req.body
+  if (!text) return res.status(400).json({ error: 'No text provided' })
+  try {
+    const prompt = `You are a fiction editor. Rewrite the following passage to improve its flow, clarity, and prose while preserving the original meaning, point of view, and the author's voice. Do not add new plot events. Output only the rewritten passage, no commentary or quotation marks.${genre ? ` Genre: ${genre}.` : ''}\n\n${text}`
+    res.json({ result: await askGroq(prompt) })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// Suggest what happens next
+app.post('/api/ai/suggest', async (req, res) => {
+  const { text, genre } = req.body
+  if (!text) return res.status(400).json({ error: 'No text provided' })
+  try {
+    const prompt = `You are a fiction writing assistant. Based on the story so far, suggest 3 distinct, compelling possibilities for what could happen next. Make them specific to the characters and situation, not generic. Each suggestion should be one sentence. Output as a numbered list (1., 2., 3.) only, no preamble or commentary.${genre ? ` Genre: ${genre}.` : ''}\n\n${text}`
+    res.json({ result: await askGroq(prompt) })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: err.message })
+  }
+})
+
 const PORT = process.env.PORT || 3001
 app.listen(PORT, () => console.log(`AI server running on http://localhost:${PORT}`))

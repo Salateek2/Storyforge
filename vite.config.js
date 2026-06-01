@@ -15,6 +15,16 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: () => '/api/ai/summarize',
       },
+      '/.netlify/functions/ai-rephrase': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+        rewrite: () => '/api/ai/rephrase',
+      },
+      '/.netlify/functions/ai-suggest': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+        rewrite: () => '/api/ai/suggest',
+      },
     },
   },
   test: {
