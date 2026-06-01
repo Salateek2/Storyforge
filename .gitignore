@@ -4,3 +4,6 @@ dist
 *.local
 
 .env
+
+# Netlify MCP deploy token (secret) — keep out of git
+deploy-token.local
