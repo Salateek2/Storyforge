@@ -820,3 +820,27 @@ body {
 /* Loading screen on-brand */
 .loading-screen { background: var(--bg); }
 
+/* Editor + character page float as an elevated "sheet" */
+.editor-page, .char-editor__page {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: clamp(1.4rem, 4vw, 3rem);
+  box-shadow: var(--shadow);
+}
+.editor-content-div { caret-color: var(--accent); }
+
+/* Themed text selection */
+::selection { background: var(--accent-soft); color: var(--text-dark); }
+
+/* Tabs sit on a faint divider; whole-row hover feels more tactile */
+.item-entry, .search-result, .export-dropdown button, .ai-panel__action,
+.theme-btn, .note-tab, .genre-chip, .novel-card { transition: all 0.15s ease; }
+
+/* Auth: glowing brand + a touch more presence */
+.welcome__logo { letter-spacing: 0.28em; color: var(--accent); text-shadow: 0 0 22px var(--accent-soft); }
+
+@media (max-width: 768px) {
+  .editor-page, .char-editor__page { border-radius: 14px; padding: 1.25rem 1.1rem; }
+}
+
