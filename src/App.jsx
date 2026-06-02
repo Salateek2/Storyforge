@@ -124,10 +124,10 @@ const EXAMPLE_NOVELS = [
   },
 ]
 const THEMES = [
-  { key: 'light', label: '◑ Midnight' },
-  { key: 'dark',  label: '⬤ Obsidian' },
-  { key: 'warm',  label: '🔥 Ember' },
-  { key: 'slate', label: '☀ Daylight' },
+  { key: 'light', label: '☀ Beige' },
+  { key: 'dark',  label: '☽ Dark' },
+  { key: 'warm',  label: '🔥 Warm' },
+  { key: 'slate', label: '◈ Slate' },
 ]
 const FONTS = [
   { key: 'Georgia, serif',           label: 'Georgia' },
