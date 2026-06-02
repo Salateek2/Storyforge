@@ -72,10 +72,10 @@ const EXAMPLE_NOVELS = [
   },
 ]
 const THEMES = [
-  { key: 'light', label: '☀ Beige' },
-  { key: 'dark',  label: '☽ Dark' },
-  { key: 'warm',  label: '🔥 Warm' },
-  { key: 'slate', label: '◈ Slate' },
+  { key: 'light', label: '◑ Midnight' },
+  { key: 'dark',  label: '⬤ Obsidian' },
+  { key: 'warm',  label: '🔥 Ember' },
+  { key: 'slate', label: '☀ Daylight' },
 ]
 const FONTS = [
   { key: 'Georgia, serif',           label: 'Georgia' },
