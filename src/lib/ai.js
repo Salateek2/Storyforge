@@ -112,18 +112,27 @@ export async function analyzeRelationships(characters, genre) {
   }
 
   const { result } = await res.json()
-  // Parse the "A | B | type | reason" lines into structured pairs; keep any
-  // unparseable line as a loose note so nothing the model returns is lost.
+  // Parse the "A | B | type | reason" lines into structured pairs. Tolerate a
+  // missing reason (3 parts), keep any unparseable line as a loose note, and
+  // drop duplicate pairs (same two names in either order).
+  const seen = new Set()
   return (result || '')
     .split('\n')
     .map(l => l.trim())
     .filter(Boolean)
     .map(line => {
       const parts = line.split('|').map(p => p.trim())
-      if (parts.length >= 4) {
+      if (parts.length >= 3) {
         return { a: parts[0], b: parts[1], type: parts[2], reason: parts.slice(3).join(' | ') }
       }
       return { a: '', b: '', type: '', reason: line.replace(/^[-•\d.\s]+/, '') }
+    })
+    .filter(p => {
+      if (!p.a) return true // keep loose notes
+      const key = [p.a.toLowerCase(), p.b.toLowerCase()].sort().join('::')
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
     })
 }
 
