@@ -1,7 +1,7 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react'
 import { countWords, formatWordCount } from './utils/wordCount'
 import { signIn, signUp, signOut, getUser, dbSelect, dbInsert, dbUpdate, dbDelete, dbUpsert } from './lib/supabase'
-import { continueWriting, summarizeChapter, rephraseText, suggestNext } from './lib/ai'
+import { continueWriting, summarizeChapter, rephraseText, suggestNext, analyzeRelationships } from './lib/ai'
 
 const STATUS_CYCLE = ['Draft', 'In Progress', 'Done']
 const STATUS_COLOR = { Draft: '#9ca3af', 'In Progress': '#f59e0b', Done: '#22c55e' }
@@ -51,6 +51,13 @@ const EXAMPLE_NOVELS = [
       { title: 'Chapter 1: The Forge', content: '<p>The hammer fell, and with each strike, sparks danced into the night air. Kira had always known the forge would be her inheritance — she had not known it would also be her prison.</p>' },
       { title: 'Chapter 2: A Strangers Coin', content: '' },
     ],
+    characters: [
+      { name: 'Kira Vane', description: 'Eighteen-year-old blacksmith\'s daughter and the protagonist. Headstrong, fiercely loyal, and quietly afraid of the gift she hides: she can shape living metal with her hands. Inherited the forge after her father fell ill and resents being tied to it.' },
+      { name: 'Master Doran Vane', description: 'Kira\'s father and mentor, a gruff master smith going grey at the temples. Taught Kira everything she knows but has kept one secret from her — the forge was built to contain an old oath, and the family is bound to keep it.' },
+      { name: 'Sael', description: 'A charming, travel-worn stranger who pays for a blade with an ancient coin no one recognizes. Knows far more about Kira\'s gift than he admits. Recruits her toward a cause that may not be his own — ally and risk in equal measure.' },
+      { name: 'Magistrate Ferrow', description: 'The cold, ambitious town magistrate who wants the Vane forge seized for the crown. The story\'s primary antagonist. Polished, patient, and willing to ruin the family slowly rather than openly.' },
+      { name: 'Tomas', description: 'Kira\'s childhood friend and the forge\'s clumsy apprentice. Comic relief and steadfast heart — the one person Kira trusts without question. Secretly sweet on her.' },
+    ],
   },
   {
     title: 'The Lighthouse Keeper',
@@ -60,6 +67,11 @@ const EXAMPLE_NOVELS = [
     chapters: [
       { title: 'Chapter 1: Tides', content: '<p>The light had not failed in forty-three years. On the morning of the forty-fourth, it did.</p>' },
     ],
+    characters: [
+      { name: 'Mara Quint', description: 'The new lighthouse keeper, a careful woman in her forties escaping a city life she won\'t discuss. Drawn into investigating why the light failed — and what happened to the keeper before her.' },
+      { name: 'Edwin Hale', description: 'The previous keeper, who vanished without trace forty-three years ago. A presence felt through the logbooks and objects he left behind. The central mystery of the novel.' },
+      { name: 'Constable Reed', description: 'The mainland constable, skeptical and territorial, who would rather the past stay buried. Alternately helps and obstructs Mara\'s questions.' },
+    ],
   },
   {
     title: 'Letters to Tomorrow',
@@ -68,6 +80,10 @@ const EXAMPLE_NOVELS = [
     pin: false,
     chapters: [
       { title: 'Prologue', content: '' },
+    ],
+    characters: [
+      { name: 'The Narrator', description: 'The author\'s present-day self, writing letters back through time to make sense of a childhood spent between two houses and two languages.' },
+      { name: 'Grandmother Iris', description: 'The fierce, funny matriarch at the memoir\'s heart, whose kitchen and stories anchored the narrator\'s summers.' },
     ],
   },
 ]
@@ -878,10 +894,81 @@ function ChapterEditor({ chapter, chapters, projectName, onUpdate, focusMode, on
   )
 }
 
-function CharacterEditor({ character, onUpdate }) {
+function RelationshipsModal({ characters, genre, onClose }) {
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [pairs, setPairs] = useState([])
+
+  useEffect(() => {
+    let alive = true
+    setLoading(true); setError(''); setPairs([])
+    analyzeRelationships(characters, genre)
+      .then(rows => { if (alive) setPairs(rows) })
+      .catch(err => { if (alive) setError(err.message || 'AI request failed. Is the server running?') })
+      .finally(() => { if (alive) setLoading(false) })
+    return () => { alive = false }
+  }, [characters, genre])
+
+  useEffect(() => {
+    function onKey(e) { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  return (
+    <div className="ch-info-backdrop" onClick={onClose}>
+      <div className="ch-info-modal" onClick={e => e.stopPropagation()}>
+        <div className="ch-info-modal__head">
+          <div>
+            <span className="ch-info-modal__eyebrow">AI insight</span>
+            <h3 className="ch-info-modal__title">Character relationships</h3>
+          </div>
+          <button className="ch-info-modal__close" onClick={onClose} title="Close (Esc)">×</button>
+        </div>
+        <div className="ch-info-modal__body">
+          {loading && <div className="rel-status">Analyzing your cast…</div>}
+          {!loading && error && <div className="ai-error-bar ai-error-bar--inline">{error}</div>}
+          {!loading && !error && pairs.length === 0 && (
+            <div className="rel-status">No clear relationships found. Try adding more detail to your character descriptions.</div>
+          )}
+          {!loading && !error && pairs.map((p, i) => (
+            <div key={i} className="rel-card">
+              {p.a ? (
+                <>
+                  <div className="rel-card__pair">
+                    <span className="rel-card__name">{p.a}</span>
+                    <span className="rel-card__link">⇄</span>
+                    <span className="rel-card__name">{p.b}</span>
+                    {p.type && <span className="rel-card__type">{p.type}</span>}
+                  </div>
+                  {p.reason && <div className="rel-card__reason">{p.reason}</div>}
+                </>
+              ) : (
+                <div className="rel-card__reason">{p.reason}</div>
+              )}
+            </div>
+          ))}
+        </div>
+        <div className="ch-info-modal__foot">
+          <span className="ch-info-modal__hint">AI-inferred from your character descriptions · not saved</span>
+          <button className="ch-info-modal__done" onClick={onClose}>Done</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function CharacterEditor({ character, onUpdate, characters, onAnalyze }) {
+  const canAnalyze = (characters?.length || 0) >= 2
   return (
     <div className="char-editor">
-      <div className="char-editor__topbar"><span className="char-editor__title">Character Profile</span></div>
+      <div className="char-editor__topbar">
+        <span className="char-editor__title">Character Profile</span>
+        <button className="rel-analyze-btn" onClick={onAnalyze} disabled={!canAnalyze}
+          title={canAnalyze ? 'Use AI to map relationships across all characters' : 'Add at least two characters first'}>
+          ✦ Analyze relationships
+        </button>
+      </div>
       <div className="char-editor__scroll">
         <div className="char-editor__page">
           <input className="char-name-input" value={character.name} placeholder="Character name..."
@@ -1066,11 +1153,13 @@ export default function App() {
   const [wordGoal, setWordGoal] = useState(() => Number(localStorage.getItem('sf_wordGoal')) || 0)
   const [pinnedNovelId, setPinnedNovelId] = useState(() => localStorage.getItem('sf_pinned_novel') || null)
   const [chapterInfoOpenId, setChapterInfoOpenId] = useState(null)
+  const [relOpen, setRelOpen] = useState(false)
   const [focusMode, setFocusMode] = useState(false)
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
   const [mobileRightOpen, setMobileRightOpen] = useState(false)
   const saveTimers = useRef({})
   const guestChaptersByNovel = useRef({})
+  const guestCharsByNovel = useRef({})
   // Becomes true once settings have been loaded from the DB, so the persist
   // effect below doesn't overwrite saved settings with initial defaults.
   const settingsLoadedRef = useRef(false)
@@ -1119,6 +1208,7 @@ export default function App() {
       status: ex.status,
     }))
     const seededChaptersByNovel = {}
+    const seededCharsByNovel = {}
     EXAMPLE_NOVELS.forEach((ex, i) => {
       const novelId = `guest-novel-${i}`
       seededChaptersByNovel[novelId] = ex.chapters.map((ch, j) => ({
@@ -1129,9 +1219,16 @@ export default function App() {
         status: 'Draft',
         position: j,
       }))
+      seededCharsByNovel[novelId] = (ex.characters || []).map((c, j) => ({
+        id: `guest-char-${i}-${j}`,
+        novel_id: novelId,
+        name: c.name,
+        description: c.description,
+      }))
     })
     setNovels(seededNovels)
     guestChaptersByNovel.current = seededChaptersByNovel
+    guestCharsByNovel.current = seededCharsByNovel
     const pinIdx = EXAMPLE_NOVELS.findIndex(n => n.pin)
     const openIdx = pinIdx >= 0 ? pinIdx : 0
     const opener = seededNovels[openIdx]
@@ -1140,7 +1237,7 @@ export default function App() {
     setActiveNovelId(opener.id)
     setChapters(seededChaptersByNovel[opener.id])
     setActiveChapterId(seededChaptersByNovel[opener.id][0]?.id || null)
-    setCharacters([])
+    setCharacters(seededCharsByNovel[opener.id] || [])
     setNotes([])
     setActiveNoteId(null)
   }
@@ -1174,6 +1271,7 @@ export default function App() {
     } else {
       const createdNovels = []
       const chaptersByNovel = {}
+      const charsByNovel = {}
       for (const ex of EXAMPLE_NOVELS) {
         const { data: novelData } = await dbInsert('novels', {
           user_id: currentUser.id, title: ex.title, genre: ex.genre, status: ex.status,
@@ -1191,6 +1289,14 @@ export default function App() {
           const chapter = Array.isArray(chData) ? chData[0] : chData
           if (chapter) chaptersByNovel[novel.id].push(chapter)
         }
+        charsByNovel[novel.id] = []
+        for (const c of (ex.characters || [])) {
+          const { data: charData } = await dbInsert('characters', {
+            novel_id: novel.id, user_id: currentUser.id, name: c.name, description: c.description,
+          })
+          const character = Array.isArray(charData) ? charData[0] : charData
+          if (character) charsByNovel[novel.id].push(character)
+        }
       }
       if (createdNovels.length === 0) { setDataLoading(false); return }
       const pinned = createdNovels.find(n => n._pin) || createdNovels[0]
@@ -1202,6 +1308,7 @@ export default function App() {
       const openerChapters = chaptersByNovel[opener.id] || []
       setChapters(openerChapters)
       setActiveChapterId(openerChapters[0]?.id || null)
+      setCharacters(charsByNovel[opener.id] || [])
       setDataLoading(false)
     }
   }
@@ -1339,7 +1446,7 @@ export default function App() {
     const remaining = novels.filter(n => n.id !== id)
     setNovels(remaining)
     if (pinnedNovelId === id) setPinnedNovelId(null)
-    if (user?.isGuest) delete guestChaptersByNovel.current[id]
+    if (user?.isGuest) { delete guestChaptersByNovel.current[id]; delete guestCharsByNovel.current[id] }
     if (!user.isGuest) dbDelete('novels', `id=eq.${id}`)
     if (activeNovelId === id) {
       const next = remaining[0]
@@ -1350,7 +1457,8 @@ export default function App() {
         const nextChapters = guestChaptersByNovel.current[next.id] || []
         setChapters(nextChapters)
         setActiveChapterId(nextChapters[0]?.id || null)
-        setCharacters([])
+        setCharacters(guestCharsByNovel.current[next.id] || [])
+        setActiveCharId(null)
         setNotes([])
         setActiveNoteId(null)
       }
@@ -1359,9 +1467,13 @@ export default function App() {
 
   async function addNovel() {
     if (user.isGuest) {
-      if (activeNovelId) guestChaptersByNovel.current[activeNovelId] = chapters
+      if (activeNovelId) {
+        guestChaptersByNovel.current[activeNovelId] = chapters
+        guestCharsByNovel.current[activeNovelId] = characters
+      }
       const n = { id: 'novel-' + Date.now(), title: 'New Novel', genre: '', status: 'Idea' }
       guestChaptersByNovel.current[n.id] = []
+      guestCharsByNovel.current[n.id] = []
       setNovels(p => [...p, n]); setActiveNovelId(n.id); setProjectName(n.title)
       setChapters([]); setCharacters([]); setNotes([]); setActiveNoteId(null)
       return
@@ -1392,10 +1504,15 @@ export default function App() {
     if (id === activeNovelId) return
     const n = novels.find(n => n.id === id)
     if (user?.isGuest) {
-      if (activeNovelId) guestChaptersByNovel.current[activeNovelId] = chapters
+      if (activeNovelId) {
+        guestChaptersByNovel.current[activeNovelId] = chapters
+        guestCharsByNovel.current[activeNovelId] = characters
+      }
       const nextChapters = guestChaptersByNovel.current[id] || []
       setChapters(nextChapters)
       setActiveChapterId(nextChapters[0]?.id || null)
+      setCharacters(guestCharsByNovel.current[id] || [])
+      setActiveCharId(null)
       setActiveNovelId(id)
       setProjectName(n?.title || 'Novel')
       return
@@ -1453,7 +1570,8 @@ export default function App() {
         onAddNote={addNote} onUpdateNote={updateNote} onDeleteNote={deleteNote}
         mobileOpen={mobileSidebarOpen} onMobileClose={() => setMobileSidebarOpen(false)} />
       {sidebarTab === 'Characters' && activeChar
-        ? <CharacterEditor character={activeChar} onUpdate={updateChar} />
+        ? <CharacterEditor character={activeChar} onUpdate={updateChar}
+            characters={characters} onAnalyze={() => setRelOpen(true)} />
         : sidebarTab === 'Chapters' && activeChapter
           ? <ChapterEditor chapter={activeChapter} chapters={chapters} projectName={projectName}
               onUpdate={updateChapter}
@@ -1470,6 +1588,9 @@ export default function App() {
         mobileOpen={mobileRightOpen} onMobileClose={() => setMobileRightOpen(false)} />
       {chapterInfoChapter && (
         <ChapterInfoModal chapter={chapterInfoChapter} characters={characters} onUpdate={updateChapter} onClose={() => setChapterInfoOpenId(null)} />
+      )}
+      {relOpen && (
+        <RelationshipsModal characters={characters} genre={novels.find(n => n.id === activeNovelId)?.genre} onClose={() => setRelOpen(false)} />
       )}
     </div>
   )

@@ -87,6 +87,47 @@ export async function suggestNext(htmlContent, genre) {
 }
 
 /**
+ * Analyzes a cast of characters and infers the relationships between them.
+ * @param {Array<{name: string, description?: string}>} characters
+ * @param {string} [genre] - Optional genre string for better context
+ * @returns {Promise<Array<{a: string, b: string, type: string, reason: string}>>}
+ */
+export async function analyzeRelationships(characters, genre) {
+  const cast = (characters || []).filter(c => c?.name?.trim())
+  if (cast.length < 2) throw new Error('Add at least two characters first.')
+
+  const roster = cast
+    .map(c => `- ${c.name.trim()}: ${(c.description || '').trim() || '(no description)'}`)
+    .join('\n')
+
+  const res = await fetch(`${AI_BASE}/ai-relationships`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text: roster.slice(0, 6000), genre }),
+  })
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.error || `Server error ${res.status}`)
+  }
+
+  const { result } = await res.json()
+  // Parse the "A | B | type | reason" lines into structured pairs; keep any
+  // unparseable line as a loose note so nothing the model returns is lost.
+  return (result || '')
+    .split('\n')
+    .map(l => l.trim())
+    .filter(Boolean)
+    .map(line => {
+      const parts = line.split('|').map(p => p.trim())
+      if (parts.length >= 4) {
+        return { a: parts[0], b: parts[1], type: parts[2], reason: parts.slice(3).join(' | ') }
+      }
+      return { a: '', b: '', type: '', reason: line.replace(/^[-•\d.\s]+/, '') }
+    })
+}
+
+/**
  * Summarizes the chapter content in 2-3 sentences.
  * @param {string} htmlContent - Full chapter HTML content
  * @returns {Promise<string>} - Plain text summary

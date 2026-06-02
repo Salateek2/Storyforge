@@ -161,7 +161,7 @@ body {
 
 /* ── Char editor ── */
 .char-editor { flex:1; display:flex; flex-direction:column; background:var(--bg); overflow:hidden; }
-.char-editor__topbar { padding:0.85rem 2rem; border-bottom:1px solid var(--border); }
+.char-editor__topbar { padding:0.85rem 2rem; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; gap:1rem; }
 .char-editor__title { font-size:0.95rem; color:var(--accent); }
 .char-editor__scroll { flex:1; overflow-y:auto; display:flex; justify-content:center; padding:2.5rem 2rem; }
 .char-editor__page { width:100%; max-width:660px; }
@@ -843,4 +843,30 @@ body {
 @media (max-width: 768px) {
   .editor-page, .char-editor__page { border-radius: 14px; padding: 1.25rem 1.1rem; }
 }
+
+/* AI relationship analysis */
+.rel-analyze-btn {
+  display:inline-flex; align-items:center; gap:6px; flex-shrink:0;
+  background:var(--accent-soft); border:1px solid var(--accent); color:var(--accent);
+  font-family:var(--font-ui); font-size:0.78rem; cursor:pointer;
+  padding:0.35rem 0.75rem; border-radius:8px; transition:all 0.15s ease;
+}
+.rel-analyze-btn:hover:not(:disabled) { background:var(--accent); color:var(--bg); }
+.rel-analyze-btn:disabled { opacity:0.4; cursor:not-allowed; }
+
+.rel-status { color:var(--text-mid); font-size:0.9rem; text-align:center; padding:1.5rem 0.5rem; }
+
+.rel-card {
+  background:var(--bg-panel); border:1px solid var(--border); border-radius:10px;
+  padding:0.7rem 0.85rem; margin-bottom:0.6rem;
+}
+.rel-card__pair { display:flex; align-items:center; flex-wrap:wrap; gap:0.4rem; }
+.rel-card__name { font-family:var(--font-ui); font-size:0.9rem; color:var(--text-dark); font-weight:600; }
+.rel-card__link { color:var(--accent); font-size:0.95rem; }
+.rel-card__type {
+  margin-left:auto; font-family:var(--font-ui); font-size:0.68rem; letter-spacing:0.02em;
+  color:var(--accent); background:var(--accent-soft); border:1px solid var(--accent);
+  padding:0.1rem 0.5rem; border-radius:10px;
+}
+.rel-card__reason { color:var(--text-mid); font-size:0.83rem; line-height:1.5; margin-top:0.35rem; }
 
