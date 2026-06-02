@@ -48,8 +48,30 @@ const EXAMPLE_NOVELS = [
     status: 'Drafting',
     pin: true,
     chapters: [
-      { title: 'Chapter 1: The Forge', content: '<p>The hammer fell, and with each strike, sparks danced into the night air. Kira had always known the forge would be her inheritance — she had not known it would also be her prison.</p>' },
-      { title: 'Chapter 2: A Strangers Coin', content: '' },
+      {
+        title: 'Chapter 1: The Forge',
+        content: `<p>The hammer fell, and with each strike, sparks danced into the night air. Kira had always known the forge would be her inheritance — she had not known it would also be her prison.</p><p>Her father slept in the back room now, more often than he worked. The cough had taken the strength from his arms first, then the steadiness from his hands, until one morning he had simply set the hammer in her palm and folded her fingers around it without a word. That had been three months ago. She had not put it down since.</p><p>Tonight the blade on the anvil was wrong. She could feel it the way she always could — a sour note under the iron, a place where the metal wanted to be something other than what the mould intended. Kira pressed her bare thumb to the glowing edge. It should have burned her. Instead the steel softened like wax, flowing to meet the shape in her mind, and the sour note went quiet.</p><p>She snatched her hand back as though stung. From the doorway, no one had seen. There was never anyone to see. That was the only mercy of it.</p>`,
+        summary: `Kira works the forge alone at night while her father, Master Doran, lies ill in the back room. We learn she inherited the forge three months ago when his hands failed. Working a flawed blade, her hidden gift surfaces: she can soften and reshape living metal with a touch. She hides it, terrified of being seen.`,
+        characters_appearing: 'Kira Vane, Master Doran Vane',
+        pov: 'Kira Vane (first-person past)',
+        todo: `Decide how openly Doran knows about her gift — does he suspect? Plant a small detail here that pays off in Ch.3 (the oath). Check period-accurate smithing terms.`,
+      },
+      {
+        title: "Chapter 2: A Stranger's Coin",
+        content: `<p>The stranger came at midday, when the forge was honest and ordinary and full of the smell of coal. He was travel-worn but not poor; his boots were good, and he watched her hands rather than her face.</p><p>"A blade," he said. "Single edge, long as your arm. I'm told the Vane forge is the only one worth the asking this side of the river."</p><p>Kira named a price meant to send him away. He set a coin on the anvil instead — old, heavier than it had any right to be, stamped with a sigil she did not know and yet, somehow, did. The sour note she heard in bad iron rang out of it like a struck bell. She had to stop herself from reaching for it.</p><p>"My name is Sael," the stranger said, and smiled as if they shared a secret. "I think you'll find you can make this blade better than most. I think you already know that."</p><p>Behind him, nailed fresh to the market post, a notice bore the magistrate's seal. Tomas had read it to her that morning, stumbling over the long words: an inquiry into the licensing of the Vane forge. Kira had pretended not to care. She curled her hand around Sael's coin and found that she did.</p>`,
+        summary: `A stranger named Sael commissions a sword and pays with an ancient coin that "rings" with the same wrongness Kira hears in flawed metal. He hints he knows about her gift. Meanwhile, a notice from Magistrate Ferrow appears, opening an inquiry into the forge's license — the first move against the family.`,
+        characters_appearing: 'Kira Vane, Sael, Tomas',
+        pov: 'Kira Vane (first-person past)',
+        todo: `Don't reveal Sael's true allegiance yet — keep it ambiguous whether he's an ally. Establish the coin's sigil so readers recognise it later. Mention Tomas briefly so his bigger Ch.4 role doesn't feel sudden.`,
+      },
+      {
+        title: 'Chapter 3: The Oath in the Iron',
+        content: `<p>Doran found her with the coin. He did not shout. That was how she knew it was serious.</p><p>"Your grandmother's grandmother built this forge around a promise," he said, lowering himself onto the cold edge of the slack-tub. "Not a contract. An oath, the old kind, the kind that's bound into the iron itself. We don't keep the fire lit to make horseshoes, Kira. We keep it lit so the thing underneath stays asleep."</p><p>She wanted to laugh. She did not, because his hands were shaking, and not from the cough.</p><p>"The coin you're holding belongs to the people who want it woken," he went on. "And the magistrate's inquiry isn't about a licence. Ferrow knows what we are. He always has. He's just found a lawful way to take the forge apart, brick by brick, until there's nothing left to hold the oath."</p><p>Kira looked at her own hands — the hands that made bad iron go quiet — and understood, for the first time, that the gift she had been hiding was not a flaw. It was the whole point of her.</p>`,
+        summary: `Doran catches Kira with Sael's coin and finally tells the truth: the forge was built around an ancient oath binding "something underneath," and keeping the fire lit keeps it asleep. The coin belongs to those who want it woken, and Ferrow's inquiry is a lawful scheme to dismantle the forge and break the oath. Kira realises her gift is the family's purpose, not a defect.`,
+        characters_appearing: 'Kira Vane, Master Doran Vane',
+        pov: 'Master Doran Vane (shifts to his POV for the reveal)',
+        todo: `This is the act-one turn — make sure the stakes land. Consider whether to show "the thing underneath" or keep it implied. Foreshadow that Sael and Ferrow may want the same thing for different reasons.`,
+      },
     ],
     characters: [
       { name: 'Kira Vane', description: 'Eighteen-year-old blacksmith\'s daughter and the protagonist. Headstrong, fiercely loyal, and quietly afraid of the gift she hides: she can shape living metal with her hands. Inherited the forge after her father fell ill and resents being tied to it.' },
@@ -65,7 +87,14 @@ const EXAMPLE_NOVELS = [
     status: 'Outlining',
     pin: false,
     chapters: [
-      { title: 'Chapter 1: Tides', content: '<p>The light had not failed in forty-three years. On the morning of the forty-fourth, it did.</p>' },
+      {
+        title: 'Chapter 1: Tides',
+        content: `<p>The light had not failed in forty-three years. On the morning of the forty-fourth, it did.</p><p>Mara found the lamp cold when she climbed the tower at dawn — not broken, not burned out, simply extinguished, as though a hand had cupped the flame in the night and held it until it gave up. The mechanism was sound. The oil was full. By every rule of the trade she had spent six months learning, the light should have burned until she came to tend it.</p><p>She wrote the failure in the logbook, as she had been taught, and that was when she noticed the older hand beneath her own neat entries. The previous keeper's writing, forty-three years gone. His last line was dated the night he disappeared. It read, in a steady careful script: <em>The light goes out tonight. I am the one who lets it.</em></p>`,
+        summary: `Mara, the new keeper, climbs the tower to find the lamp mysteriously extinguished despite being mechanically sound and full of oil. Recording the failure in the logbook, she discovers the previous keeper's final entry from 43 years ago — the night he vanished — claiming he himself would put the light out. The central mystery opens.`,
+        characters_appearing: 'Mara Quint, Edwin Hale',
+        pov: 'Mara Quint (third-person limited)',
+        todo: `Keep the supernatural vs. rational explanation balanced — reader shouldn't be sure yet. Research lighthouse lamp mechanisms of the period. Decide the real reason the light failed (tie to Edwin's fate).`,
+      },
     ],
     characters: [
       { name: 'Mara Quint', description: 'The new lighthouse keeper, a careful woman in her forties escaping a city life she won\'t discuss. Drawn into investigating why the light failed — and what happened to the keeper before her.' },
@@ -79,7 +108,14 @@ const EXAMPLE_NOVELS = [
     status: 'Idea',
     pin: false,
     chapters: [
-      { title: 'Prologue', content: '' },
+      {
+        title: 'Prologue',
+        content: `<p>I have been writing letters to a person who does not exist yet: myself, some years from now, old enough to forgive the parts I'm about to set down.</p><p>My grandmother kept everything — bus tickets, the foil from chocolate bars, the last word in every argument. When she died we found a drawer of letters she had never sent. This book is my drawer. I am sending them anyway.</p>`,
+        summary: `Framing prologue. The narrator explains the book's conceit: a memoir written as letters to their future self. Introduces Grandmother Iris through the image of a drawer of unsent letters found after her death — the emotional seed of the whole project.`,
+        characters_appearing: 'The Narrator, Grandmother Iris',
+        pov: 'The Narrator (first-person, present-day reflective)',
+        todo: `Set the tone — warm but unsentimental. Decide whether each chapter opens as an actual "letter." Confirm timeline details about Iris with family before publishing anything verifiable.`,
+      },
     ],
     characters: [
       { name: 'The Narrator', description: 'The author\'s present-day self, writing letters back through time to make sense of a childhood spent between two houses and two languages.' },
@@ -1218,6 +1254,10 @@ export default function App() {
         content: ch.content,
         status: 'Draft',
         position: j,
+        summary: ch.summary || '',
+        characters_appearing: ch.characters_appearing || '',
+        pov: ch.pov || '',
+        todo: ch.todo || '',
       }))
       seededCharsByNovel[novelId] = (ex.characters || []).map((c, j) => ({
         id: `guest-char-${i}-${j}`,
@@ -1285,6 +1325,8 @@ export default function App() {
           const { data: chData } = await dbInsert('chapters', {
             novel_id: novel.id, user_id: currentUser.id,
             title: ch.title, content: ch.content, status: 'Draft', position: j,
+            summary: ch.summary || '', characters_appearing: ch.characters_appearing || '',
+            pov: ch.pov || '', todo: ch.todo || '',
           })
           const chapter = Array.isArray(chData) ? chData[0] : chData
           if (chapter) chaptersByNovel[novel.id].push(chapter)
