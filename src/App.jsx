@@ -178,28 +178,33 @@ function AuthScreen({ onAuth, onGuest }) {
     if (password.length < 6) { setMsg('Password must be at least 6 characters.'); return }
     setMsg(''); setLoading(true)
     const email = usernameToEmail(uname)
-    if (mode === 'signup') {
-      const data = await signUp(email, password)
-      if (data.error_code === 'user_already_exists' || data.msg?.includes('already registered')) {
-        setMsg('That username is taken. Try another, or sign in.')
-      } else if (data.error || data.msg) {
-        setMsg(data.error?.message || data.msg || 'Could not create account.')
-      } else if (data.access_token) {
-        onAuth(data.user)                        // confirmation off → logged in instantly
+    try {
+      if (mode === 'signup') {
+        const data = await signUp(email, password)
+        if (data.error_code === 'user_already_exists' || data.msg?.includes('already registered')) {
+          setMsg('That username is taken. Try another, or sign in.')
+        } else if (data.error || data.msg) {
+          setMsg(data.error?.message || data.msg || 'Could not create account.')
+        } else if (data.access_token) {
+          onAuth(data.user)                        // confirmation off → logged in instantly
+        } else {
+          // Account created but no session: confirmation is still on in Supabase.
+          const signin = await signIn(email, password)
+          if (signin.access_token) onAuth(signin.user)
+          else setMsg('Account created, but logins are blocked by email confirmation. Turn off "Confirm email" in Supabase.')
+        }
       } else {
-        // Account created but no session: confirmation is still on in Supabase.
-        const signin = await signIn(email, password)
-        if (signin.access_token) onAuth(signin.user)
-        else setMsg('Account created, but logins are blocked by email confirmation. Turn off "Confirm email" in Supabase.')
+        const data = await signIn(email, password)
+        if (data.access_token) onAuth(data.user)
+        else if (data.error_description?.toLowerCase().includes('not confirmed')) {
+          setMsg('Email confirmation is still on in Supabase — turn it off so logins work.')
+        } else setMsg('Wrong username or password.')
       }
-    } else {
-      const data = await signIn(email, password)
-      if (data.access_token) onAuth(data.user)
-      else if (data.error_description?.toLowerCase().includes('not confirmed')) {
-        setMsg('Email confirmation is still on in Supabase — turn it off so logins work.')
-      } else setMsg('Wrong username or password.')
+    } catch (err) {
+      setMsg('Could not reach the server. Check your connection and try again.')
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }
 
   return (

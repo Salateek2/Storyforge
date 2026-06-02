@@ -1,5 +1,8 @@
-const BASE = import.meta.env.VITE_SUPABASE_URL
-const ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
+// Fall back to the project's public values so production works even when the
+// build env vars aren't configured. The anon/publishable key is meant to be
+// exposed in the browser (data is protected by Supabase Row-Level Security).
+const BASE = import.meta.env.VITE_SUPABASE_URL || 'https://vkxbfiebhwdaniljflxn.supabase.co'
+const ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_LC_5M4Nfqb4nSDhK1rWcsw_fpKY_M0S'
 const TOKEN_KEY = 'sf_token'
 
 function getToken() { return localStorage.getItem(TOKEN_KEY) }
