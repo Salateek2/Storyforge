@@ -27,7 +27,11 @@ export async function signUp(email, password) {
     headers: headers(),
     body: JSON.stringify({ email, password }),
   })
-  return r.json()
+  const data = await r.json()
+  // When email confirmation is off, signup returns a session — persist it so
+  // database calls run as the new user (not anon) right after registering.
+  if (data.access_token) saveToken(data.access_token)
+  return data
 }
 
 export async function signIn(email, password) {
