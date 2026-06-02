@@ -157,25 +157,47 @@ function estimateRT(wc) {
   return m === 1 ? '1 min read' : m + ' min read'
 }
 
+// Usernames are mapped to a private internal email so we can use Supabase
+// email auth without ever asking the user for a real email address.
+function usernameToEmail(username) {
+  const clean = username.trim().toLowerCase().replace(/[^a-z0-9_.-]/g, '')
+  return `${clean}@storyforge.app`
+}
+
 function AuthScreen({ onAuth, onGuest }) {
   const [mode, setMode] = useState('login')
-  const [email, setEmail] = useState('')
+  const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [msg, setMsg] = useState('')
   const [loading, setLoading] = useState(false)
 
   async function handleSubmit(e) {
     e.preventDefault()
+    const uname = username.trim().toLowerCase().replace(/[^a-z0-9_.-]/g, '')
+    if (uname.length < 3) { setMsg('Username must be at least 3 characters (letters, numbers, _ . -).'); return }
+    if (password.length < 6) { setMsg('Password must be at least 6 characters.'); return }
     setMsg(''); setLoading(true)
+    const email = usernameToEmail(uname)
     if (mode === 'signup') {
       const data = await signUp(email, password)
-      if (data.error || data.msg) setMsg(data.error?.message || data.msg || 'Error signing up')
-      else if (data.access_token) { onAuth(data.user) }
-      else setMsg('Account created! Check your email to confirm, then sign in.')
+      if (data.error_code === 'user_already_exists' || data.msg?.includes('already registered')) {
+        setMsg('That username is taken. Try another, or sign in.')
+      } else if (data.error || data.msg) {
+        setMsg(data.error?.message || data.msg || 'Could not create account.')
+      } else if (data.access_token) {
+        onAuth(data.user)                        // confirmation off → logged in instantly
+      } else {
+        // Account created but no session: confirmation is still on in Supabase.
+        const signin = await signIn(email, password)
+        if (signin.access_token) onAuth(signin.user)
+        else setMsg('Account created, but logins are blocked by email confirmation. Turn off "Confirm email" in Supabase.')
+      }
     } else {
       const data = await signIn(email, password)
-      if (!data.access_token) setMsg(data.error_description || 'Invalid email or password')
-      else onAuth(data.user)
+      if (data.access_token) onAuth(data.user)
+      else if (data.error_description?.toLowerCase().includes('not confirmed')) {
+        setMsg('Email confirmation is still on in Supabase — turn it off so logins work.')
+      } else setMsg('Wrong username or password.')
     }
     setLoading(false)
   }
@@ -185,10 +207,11 @@ function AuthScreen({ onAuth, onGuest }) {
       <p className="welcome__logo">StoryForge</p>
       <h1 className="auth-screen__title">{mode === 'login' ? 'Welcome back' : 'Create account'}</h1>
       <form className="auth-form" onSubmit={handleSubmit}>
-        <input className="auth-input" type="email" placeholder="Email" value={email}
-          onChange={e => setEmail(e.target.value)} required />
-        <input className="auth-input" type="password" placeholder="Password" value={password}
-          onChange={e => setPassword(e.target.value)} required />
+        <input className="auth-input" type="text" placeholder="Username" autoComplete="username"
+          value={username} onChange={e => setUsername(e.target.value)} required />
+        <input className="auth-input" type="password" placeholder="Password"
+          autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+          value={password} onChange={e => setPassword(e.target.value)} required />
         {msg && <p className="auth-msg">{msg}</p>}
         <button className="auth-submit" type="submit" disabled={loading}>
           {loading ? '…' : mode === 'login' ? 'Sign in' : 'Sign up'}
